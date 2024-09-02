@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대화형 TXT 데이터 제작</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            margin: auto;
+        }
+        h1 {
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        textarea {
+            margin-top: 10px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .task-buttons button {
+            background-color: #6c757d;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .task-buttons button.selected {
+            background-color: #007bff;
+        }
+        .counter {
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: right;
+        }
+        .set {
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>대화형 TXT 데이터 제작</h1>
+        
+        <div id="form-page-1">
+            <div class="counter">0/50 세트 완료</div>
+
+            <div id="set-container"></div>
+
+            <button onclick="submitData()">데이터 제출하기</button>
+            <button onclick="downloadExcel()" style="background-color: green; margin-left: 10px;">Excel로 다운로드</button>
+        </div>
+
+        <div id="form-page-2" style="display:none;">
+            <h2>2페이지로 넘어왔습니다!</h2>
+            <p>여기서 다음 작업을 수행하세요.</p>
+        </div>
+    </div>
+
+    <script>
+        let dataStore = [];
+        let completedSets = 0;
+        let totalCompletedSets = 0;  // 전체 작업 횟수를 추적
+        const maxSets = 50;  // 최대 50세트까지 허용
+
+        const tasks = ["Brainstorming", "Chat", "Classification", "ClosedQA", "Code", "Extraction", "Generation", "OpenQA", "Rewrite", "Summarization", "Translation"];
+        
+        // 업로드된 파일에서 가져온 단어 리스트를 배열로 저장
+        const instructions = [
+            "꾸밈없이", "단순하게", "복잡하게", "분석적으로", "학문적으로", "논증적으로", "대화형으로", "에세이로", "창의적으로", 
+            "극적으로", "비평적으로", "풍자적으로", "묘사적으로", "설명적으로", "설득력있게", "교육적으로", "정보를 제공하며", 
+            "은유적으로", "시적으로", "회고하며", "전기적으로", "서사적으로", "가상으로", "노랫말로", "철학적으로", "의식의 흐름대로", 
+            "비정형 텍스트로", "선험적으로", "모더니즘", "패러디", "유머러스하게", "슬프게", "무섭게", "긍정적으로", "부정적으로", 
+            "공손하게", "강하게", "공격적인", "적극적으로", "친절하게", "조심스럽게", "점잖게", "당당하게", "엄격하게", "망설이며", 
+            "비웃으며", "겸손하게", "냉담하게", "엉큼하게", "모호하게", "단호하게", "위엄있게", "고의적으로", "냉소적으로", "새침하게", 
+            "온유하게", "능글맞게", "빈정거리며", "대범하게", "태연하게", "어리광을 부리며", "얌전하게", "무례하게", "새초롬하게", 
+            "데면데면하게", "정중하게", "간사하게", "확고하게", "겸허하게", "조곤조곤하게", "유순하게", "수줍게", "미온적으로", 
+            "퉁명스럽게", "청승맞게", "순순히", "열정적으로", "애매모호하게", "주눅들어", "얍삽하게", "악착같이", "시니컬하게", 
+            "퉁명스럽게", "개방적으로", "보수적으로", "인간적으로", "장난스럽게", "앙칼지게", "일관되게", "무심하게", "냉철하게", 
+            "덤덤하게", "정렬적으로", "다정하게", "다정다감하게", "격정적으로", "기쁨", "화남", "슬픔", "두려움", "걱정", "즐거움", 
+            "놀람", "분노", "불안", "혐오", "실망", "당황", "당혹감", "감사하는", "편안한", "만족한", "흥분한", "충격 받은", "울컥하는", 
+            "경외감이 드는", "낭만적인", "안도하는", "신이 나는", "한심한", "부끄러운", "죄책감이 드는", "열등감을 느끼는", "외로운", 
+            "시선을 의식하는", "외로운", "괴로운", "억울한", "스트레스 받는", "헷갈리는", "을씨년스럽게", "기괴하게", "싱그럽게", 
+            "칙칙하게", "화기애애하게", "음울하게", "우중충하게", "분위기 있게", "살벌하게", "음산스럽게", "적막하게", "찬물을 끼얹으며", 
+            "스산스럽게", "험악스레", "상실감이 드는", "북받치는", "감동이 밀려오는", "목이 메이는", "회의적인", "환멸이 느껴지는", 
+            "눈물이 나는", "감동적인", "우울한", "후회되는", "비통한", "해요체", "하오체", "합쇼체", "습니다체", "해라체", "해체", 
+            "하게체", "20대 말투", "북한 사람처럼", "존댓말", "반말", "구어체", "문어체", "표준어", "사투리", "일베 말투", "엄마 말투", 
+            "노인 말투", "사극체", "더듬는 말투", "군인 말투", "평서문", "의문문", "명령문", "청유문", "어미에 ‘-다람쥐’를 붙여서", 
+            "중국어투", "일본말투", "백종원 말투(~쥬)", "8살 아이가 알아들 수 있게", "전문가 관점에서", "평이하게", "난해하게", 
+            "이해하기 쉽게", "주인공 시점", "1인칭 시점", "제 3자의 관점", "1인칭 주인공 시점", "1인칭 관찰자 시점", "전지적 작가 시점", 
+            "작가 관찰자 시점"
+        ];
+
+        function getRandomInstruction() {
+            const randomIndex = Math.floor(Math.random() * instructions.length);
+            return instructions[randomIndex];
+        }
+
+        function createTurn(index) {
+            const setDiv = document.createElement('div');
+            setDiv.className = 'set';
+            setDiv.id = `set-${index}`;
+
+            const taskButtons = document.createElement('div');
+            taskButtons.className = 'task-buttons';
+            tasks.forEach(task => {
+                const button = document.createElement('button');
+                button.textContent = task;
+                button.onclick = () => {
+                    document.querySelectorAll(`#set-${index} .task-buttons button`).forEach(btn => btn.classList.remove('selected'));
+                    button.classList.add('selected');
+                };
+                taskButtons.appendChild(button);
+            });
+
+            // 랜덤한 Instruction 가져오기
+            const randomInstruction = getRandomInstruction();
+
+            setDiv.innerHTML = `
+                <label for="instruction-${index}">Instruction</label>
+                <input type="text" id="instruction-${index}" value="${randomInstruction}" readonly>
+
+                <label for="additional-${index}">INPUT</label>
+                <input type="text" id="additional-${index}" placeholder="INPUT을 입력하세요">
+
+                <label for="question-${index}">질문 입력</label>
+                <textarea id="question-${index}" placeholder="질문을 입력하세요" rows="3"></textarea>
+
+                <label for="modelAnswer-${index}">모델 답변</label>
+                <textarea id="modelAnswer-${index}" placeholder="모델 답변을 입력하세요" rows="3"></textarea>
+
+                <label for="modifiedAnswer-${index}">수정 답변</label>
+                <textarea id="modifiedAnswer-${index}" placeholder="수정 답변을 입력하세요" rows="3"></textarea>
+
+                <label for="reasoning-${index}">답변추론</label>
+                <textarea id="reasoning-${index}" placeholder="답변추론을 입력하세요" rows="3"></textarea>
+
+            `;
+
+            setDiv.insertBefore(taskButtons, setDiv.firstChild);
+
+            document.getElementById('set-container').appendChild(setDiv);
+        }
+
+        function initializeForm() {
+            for (let i = 0; i < 5; i++) {  // 한 페이지에 5개의 턴을 생성
+                createTurn(i);
+            }
+        }
+
+        function updateCounter() {
+            document.querySelector('.counter').textContent = `${completedSets}/50 세트`;
+        }
+
+        function submitData() {
+            let currentSet = [];
+            for (let i = 0; i < 5; i++) {
+                const taskSelected = document.querySelector(`#set-${i} .task-buttons .selected`);
+                if (taskSelected) {
+                    const task = taskSelected.textContent;
+                    const instruction = document.getElementById(`instruction-${i}`).value;
+                    const question = document.getElementById(`question-${i}`).value;
+                    const modelAnswer = document.getElementById(`modelAnswer-${i}`).value;
+                    const modifiedAnswer = document.getElementById(`modifiedAnswer-${i}`).value;
+                    const reasoning = document.getElementById(`reasoning-${i}`).value;
+                    const additional = document.getElementById(`additional-${i}`).value;
+
+                    currentSet.push({
+                        task: task,
+                        instruction: instruction,
+                        question: question,
+                        modelAnswer: modelAnswer,
+                        modifiedAnswer: modifiedAnswer,
+                        reasoning: reasoning,
+                        additional: additional
+                    });
+                } else {
+                    alert("모든 턴의 Task를 선택해 주세요.");
+                    return;
+                }
+            }
+
+            dataStore.push(...currentSet);
+            completedSets++;
+            totalCompletedSets++;
+
+            if (completedSets >= 50) {
+                alert("50세트를 모두 완료했습니다. 데이터를 다운로드 하세요.");
+            }
+
+            alert("데이터가 성공적으로 제출되었습니다!");
+            updateCounter();
+            document.getElementById('set-container').innerHTML = '';
+            initializeForm();
+        }
+
+        function downloadExcel() {
+            if (dataStore.length === 0) {
+                alert("다운로드할 데이터가 없습니다.");
+                return;
+            }
+
+            const headers = ["Task", "Instruction", "Question", "Model Answer", "Modified Answer", "Reasoning", "Additional"];
+            const data = [headers];
+
+            dataStore.forEach(entry => {
+                data.push([
+                    entry.task,
+                    entry.instruction,
+                    entry.question,
+                    entry.modelAnswer,
+                    entry.modifiedAnswer,
+                    entry.reasoning,
+                    entry.additional
+                ]);
+            });
+
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "대화 데이터");
+
+            XLSX.writeFile(workbook, "대화형_데이터.xlsx");
+
+            // 다운로드 후 데이터 초기화
+            dataStore = [];
+            completedSets = 0;
+            updateCounter();
+        }
+
+        initializeForm();
+        updateCounter();
+    </script>
+</body>
+</html>

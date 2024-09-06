@@ -69,12 +69,12 @@
             margin-bottom: 20px;
             padding-bottom: 20px;
         }
-        .instruction-type {
+        .instruction-type, .task-type {
             display: flex;
             gap: 10px;
             margin-bottom: 10px;
         }
-        .instruction-type button {
+        .instruction-type button, .task-type button {
             background-color: #28a745;
             color: white;
             padding: 5px 10px;
@@ -82,6 +82,11 @@
             border-radius: 4px;
             cursor: default;
             font-size: 14px;
+        }
+        .task-type label {
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -107,189 +112,154 @@
     <script>
         let dataStore = [];
         let completedSets = 0;
-        let totalCompletedSets = 0;  // 전체 작업 횟수를 추적
-        const maxSets = 50;  // 최대 50세트까지 허용
+        let totalCompletedSets = 0;
+        const maxSets = 50;
 
-        const tasks = ["Brainstorming", "Chat", "Classification", "ClosedQA", "Code", "Extraction", "Generation", "OpenQA", "Rewrite", "Summarization", "Translation"];  /* Task 목록 */
+        const tasks = ["Brainstorming", "Chat", "Classification", "ClosedQA", "Code", "Extraction", "Generation", "OpenQA", "Rewrite", "Summarization", "Translation"];
 
-        // Instruction의 타입별 분류 (2단계 구조)
-        const instructionTypes = { 
-	"구조적 제약": {
-   		"길이": ["10문장으로", "대략 10단어 정도로", "최대 1문단으로", "최소 10개 글자로", "10~20 음절 사이로", "3개의 예시를 들어", "짧게", "간략하게", "자세하게", "디테일하게"],
-    		"형식": ["줄글로", "문장으로", "번호", "불렛", "글머리 기호", "표로", "테이블 형태로", "알파벳순", "가나다순"],
-   		"키워드": ["‘안녕'으로 시작하여", "‘안녕'으로 끝내줘", "‘안녕'을 포함하여", "‘안녕'을 포함하지 말고", "‘안녕'을 다섯 번 사용하여", "이모티콘을 사용하여", "마침표를 붙이지 말고"]
- 	 },
-  	"스타일 제약": {
-    		"작문": ["꾸밈없이", "단순하게", "복잡하게", "분석적으로", "학문적으로", "논증적으로", "대화형으로", "에세이로", "창의적으로", "극적으로", "비평적으로", "풍자적으로", "묘사적으로", "설명적으로", "설득력있게", "교육적으로", "정보를 제공하며", "은유적으로", "시적으로", "회고하며", "전기적으로", "서사적으로", "가상으로", "노랫말로", "철학적으로", "의식의 흐름대로", "비정형 텍스트로", "선험적으로", "모더니즘", "패러디"],
-    		"어조": ["유머러스하게", "슬프게", "무섭게", "긍정적으로", "부정적으로", "공손하게", "강하게", "공격적인", "적극적으로", "친절하게", "조심스럽게", "점잖게", "당당하게", "엄격하게", "망설이며", "비웃으며", "겸손하게", "냉담하게", "엉큼하게", "모호하게", "단호하게", "위엄있게",  "고의적으로",  "냉소적으로", "새침하게", "온유하게", "능글맞게", "빈정거리며", "대범하게", "태연하게", "어리광을 부리며", "얌전하게","무례하게","새초롬하게",  "데면데면하게", "정중하게", "간사하게", "확고하게","겸허하게","조곤조곤하게", "유순하게","수줍게","미온적으로","퉁명스럽게","청승맞게", "순순히", "열정적으로", "애매모호하게","주눅들어", "얍삽하게","악착같이","시니컬하게","퉁명스럽게","개방적으로", "보수적으로","인간적으로","장난스럽게","앙칼지게", "일관되게","무심하게", "냉철하게", "덤덤하게", "정렬적으로","다정하게","다정다감하게", "격정적으로" ],
-    		"분위기": [ "기쁨","화남", "슬픔","두려움", "걱정", "즐거움", "놀람", "분노", "불안", "혐오","실망", "당황", "당혹감","감사하는", "편안한", "만족한", "흥분한", "충격 받은", "울컥하는", "경외감이 드는", "낭만적인", "안도하는",
-  "신이 나는", "한심한","부끄러운", "죄책감이 드는", "열등감을 느끼는", "외로운", "시선을 의식하는", "외로운", "괴로운", "억울한", "스트레스 받는", "헷갈리는", "을씨년스럽게", "기괴하게", "싱그럽게", "칙칙하게", "화기애애하게", "음울하게", "우중충하게", "분위기 있게","살벌하게", "음산스럽게", "적막하게", "찬물을 끼얹으며", "스산스럽게", "험악스레", "상실감이 드는", "북받치는", "감동이 밀려오는", "목이 메이는", "회의적인","환멸이 느껴지는", "눈물이 나는", "감동적인", "우울한", "후회되는","비통한" ],
-    		"문체": ["해요체", "하오체", "합쇼체","습니다체", "해라체", "해체", "하게체", "20대 말투","북한 사람처럼", "존댓말","반말", "구어체","문어체","표준어", "사투리", "일베 말투", "엄마 말투", "노인 말투", "사극체",  "더듬는 말투", "군인 말투", " 평서문", "의문문", "명령문", "청유문", "어미에 ‘-다람쥐’를 붙여서", "중국어투", "일본말투", "백종원 말투(~쥬)", "8살 아이가 알아들 수 있게","전문가 관점에서", "평이하게", "난해하게", "이해하기 쉽게","주인공 시점", "1인칭 시점","제 3자의 관점", "1인칭 주인공 시점",  "1인칭 관찰자 시점", "전지적 작가 시점", "작가 관찰자 시점"]
-  	}
-
+        // 비율에 맞는 Instruction 분류
+        const instructionTypes = {
+            "구조적 제약": {
+                "길이": ["10문장으로", "대략 10단어 정도로", "최대 1문단으로", "최소 10개 글자로"],
+                "형식": ["줄글로", "문장으로", "번호", "불렛", "표로"],
+                "키워드": ["‘안녕'으로 시작하여", "‘안녕'을 포함하여", "이모티콘을 사용하여"]
+            },
+            "스타일 제약": {
+                "작문": ["꾸밈없이", "단순하게", "복잡하게", "논증적으로", "에세이로"],
+                "어조": ["유머러스하게", "슬프게", "공손하게"],
+                "분위기": ["기쁨", "슬픔", "두려움"]
+            }
         };
 
-        function getRandomInstruction() {
-            const allInstructions = [];
-            for (const level1 of Object.values(instructionTypes)) {
-                for (const list of Object.values(level1)) {
-                    allInstructions.push(...list);  /* 모든 Instruction을 하나의 배열로 결합 */
-                }
-            }
-            const randomIndex = Math.floor(Math.random() * allInstructions.length);  /* 랜덤한 인덱스 생성 */
-            return allInstructions[randomIndex];  /* 랜덤한 Instruction 반환 */
+        // 비율에 따라 Instruction 생성 (스타일 4, 구조적 제약 1)
+	function generateInstructionSet() {
+    	    let instructions = [];
+            let instructionTypesList = [];
+
+         // 무조건 스타일 제약 4개 선택
+         for (let i = 4; i > 0; i--) {
+             let instruction = getRandomInstructionFromType("스타일 제약");
+             instructions.push(instruction);
+             instructionTypesList.push("스타일 제약");
+         }
+
+        // 구조적 제약에서 1개 선택
+        let structuralInstruction = getRandomInstructionFromType("구조적 제약");
+        instructions.push(structuralInstruction);
+        instructionTypesList.push("구조적 제약");
+
+       // 합쳐서 섞기
+       instructions = shuffleArray(instructions);
+       instructionTypesList = shuffleArray(instructionTypesList);
+
+       return { instructions, instructionTypesList };
+	}
+
+        // 타입에 맞는 랜덤 Instruction 선택
+        function getRandomInstructionFromType(type) {
+            const typeCategories = instructionTypes[type];
+            const allInstructions = [].concat(...Object.values(typeCategories));
+            const randomIndex = Math.floor(Math.random() * allInstructions.length);
+            return allInstructions[randomIndex];
         }
 
+        // 배열 섞기
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 새로고침 기능: 기존 instruction을 비율에 맞게 새로고침 (기존 타입 유지)
+        function refreshInstruction(index, type, subType) {
+            const newInstruction = getRandomInstructionFromSubType(type, subType);
+            const instructionInput = document.getElementById(`instruction-${index}`);
+            const instructionTypeLabel = document.getElementById(`instruction-type-${index}`);
+
+            instructionInput.value = newInstruction;  // 새로운 Instruction으로 대체
+            instructionTypeLabel.innerHTML = `${type} - ${subType}`;  // 타입 그대로 유지
+        }
+
+        // 중분류까지 포함한 랜덤 Instruction 선택
+        function getRandomInstructionFromSubType(type, subType) {
+            const subTypeList = instructionTypes[type][subType];
+            const randomIndex = Math.floor(Math.random() * subTypeList.length);
+            return subTypeList[randomIndex];
+        }
+
+        // 랜덤 Instruction의 타입과 중분류 가져오기
         function getInstructionTypes(instruction) {
-            for (const [level1Type, level1] of Object.entries(instructionTypes)) {  /* 1단계 타입 탐색 */
-                for (const [level2Type, list] of Object.entries(level1)) {  /* 2단계 타입 탐색 */
-                    if (list.includes(instruction)) {  /* Instruction이 2단계 타입에 속하는지 확인 */
-                        return [level1Type, level2Type];  /* 1단계, 2단계 타입 반환 */
+            for (const [level1Type, level1] of Object.entries(instructionTypes)) {
+                for (const [level2Type, list] of Object.entries(level1)) {
+                    if (list.includes(instruction)) {
+                        return [level1Type, level2Type];
                     }
                 }
             }
-            return ["알 수 없음", "알 수 없음"];  /* 타입을 찾을 수 없는 경우 */
+            return ["알 수 없음", "알 수 없음"];
         }
 
+        // 세트 생성
         function createTurn(index) {
-            const setDiv = document.createElement('div');  /* 새 세트를 위한 div 생성 */
-            setDiv.className = 'set';  /* 클래스 이름 지정 */
-            setDiv.id = `set-${index}`;  /* id 지정 */
+            const setDiv = document.createElement('div');
+            setDiv.className = 'set';
+            setDiv.id = `set-${index}`;
 
-            const taskButtons = document.createElement('div');  /* Task 버튼들을 담을 div 생성 */
-            taskButtons.className = 'task-buttons';  /* 클래스 이름 지정 */
+            const taskButtons = document.createElement('div');
+            taskButtons.className = 'task-buttons';
             tasks.forEach(task => {
-                const button = document.createElement('button');  /* 각 Task 버튼 생성 */
-                button.textContent = task;  /* 버튼에 Task 이름 설정 */
+                const button = document.createElement('button');
+                button.textContent = task;
                 button.onclick = () => {
-                    document.querySelectorAll(`#set-${index} .task-buttons button`).forEach(btn => btn.classList.remove('selected'));  /* 다른 버튼에서 선택 표시 제거 */
-                    button.classList.add('selected');  /* 현재 버튼에 선택 표시 추가 */
+                    document.querySelectorAll(`#set-${index} .task-buttons button`).forEach(btn => btn.classList.remove('selected'));
+                    button.classList.add('selected');
                 };
-                taskButtons.appendChild(button);  /* Task 버튼을 taskButtons div에 추가 */
+                taskButtons.appendChild(button);
             });
 
-            // 랜덤한 Instruction과 그에 해당하는 2단계 타입 가져오기
-            const randomInstruction = getRandomInstruction();  /* 랜덤한 Instruction 선택 */
-            const [typeLevel1, typeLevel2] = getInstructionTypes(randomInstruction);  /* Instruction의 1단계, 2단계 타입 확인 */
+            // 랜덤한 Instruction 세트와 타입 가져오기
+            const { instructions, instructionTypesList } = generateInstructionSet();
+            const [typeLevel1, typeLevel2] = getInstructionTypes(instructions[0]);
 
             setDiv.innerHTML = `
                 <div class="instruction-type">
-                    <button>${typeLevel1}</button>
-                    <button>${typeLevel2}</button>
+                    <span id="instruction-type-${index}">${instructionTypesList[0]} - ${typeLevel2}</span>
                 </div>
                 <label for="instruction-${index}">Instruction</label>
-                <input type="text" id="instruction-${index}" value="${randomInstruction}" readonly>  <!-- 랜덤한 Instruction과 타입 표시 -->
+                <input type="text" id="instruction-${index}" value="${instructions[0]}" readonly>
+                <button onclick="refreshInstruction(${index}, '${instructionTypesList[0]}', '${typeLevel2}')">Instruction 새로고침</button>
 
                 <label for="question-${index}">사용자 질문</label>
-                <textarea id="question-${index}" placeholder="Instruction 키워드를 사용한 질문을 입력하세요" rows="3"></textarea>
+                <textarea id="question-${index}" placeholder="질문을 입력하세요" rows="3"></textarea>
 
                 <label for="modelAnswer-${index}">모델 답변</label>
-                <textarea id="modelAnswer-${index}" placeholder="모델 답변을 복사/붙여넣기로 입력하세요" rows="3"></textarea>
+                <textarea id="modelAnswer-${index}" placeholder="모델 답변을 입력하세요" rows="3"></textarea>
 
                 <label for="modifiedAnswer-${index}">수정 답변</label>
-                <textarea id="modifiedAnswer-${index}" placeholder="모델 답변이 요구사항을 따르지 않는다면 수정하세요" rows="3"></textarea>
+                <textarea id="modifiedAnswer-${index}" placeholder="수정 답변을 입력하세요" rows="3"></textarea>
 
-                <label for="reasoning-${index}">답변이유</label>
-                <textarea id="reasoning-${index}" placeholder="모델에게 답변 이유를 묻고 모델 답변을 입력하세요" rows="3"></textarea>
-
+                <label for="reasoning-${index}">답변 이유</label>
+                <textarea id="reasoning-${index}" placeholder="답변 이유를 입력하세요" rows="3"></textarea>
             `;
 
-            setDiv.insertBefore(taskButtons, setDiv.firstChild);  /* Task 버튼들을 세트의 첫 번째 요소로 삽입 */
-
-            document.getElementById('set-container').appendChild(setDiv);  /* 생성된 세트를 set-container에 추가 */
+            setDiv.insertBefore(taskButtons, setDiv.firstChild);
+            document.getElementById('set-container').appendChild(setDiv);
         }
 
         function initializeForm() {
-            for (let i = 0; i < 5; i++) {  // 한 페이지에 5개의 턴을 생성
+            for (let i = 0; i < 5; i++) {
                 createTurn(i);
             }
         }
 
         function updateCounter() {
-            document.querySelector('.counter').textContent = `${completedSets}/50 세트 완료`;  /* 카운터 업데이트 */
+            document.querySelector('.counter').textContent = `${completedSets}/50 세트 완료`;
         }
 
-        function submitData() {
-            let currentSet = [];  /* 현재 세트 데이터를 저장할 배열 */
-            for (let i = 0; i < 5; i++) {
-                const taskSelected = document.querySelector(`#set-${i} .task-buttons .selected`);
-                if (taskSelected) {
-                    const task = taskSelected.textContent;
-                    const instruction = document.getElementById(`instruction-${i}`).value;
-                    const question = document.getElementById(`question-${i}`).value;
-                    const modelAnswer = document.getElementById(`modelAnswer-${i}`).value;
-                    const modifiedAnswer = document.getElementById(`modifiedAnswer-${i}`).value;
-                    const reasoning = document.getElementById(`reasoning-${i}`).value;
-                    
-                    // Instruction 타입 추출
-                    const [typeLevel1, typeLevel2] = getInstructionTypes(instruction);
-
-                    currentSet.push({
-                        task: task,
-                        instruction: instruction,
-                        typeLevel1: typeLevel1,
-                        typeLevel2: typeLevel2,
-                        question: question,
-                        modelAnswer: modelAnswer,
-                        modifiedAnswer: modifiedAnswer,
-                        reasoning: reasoning,
-                    });  /* 각 항목을 currentSet 배열에 추가 */
-                } else {
-                    alert("모든 턴의 Task를 선택해 주세요.");  /* Task가 선택되지 않은 경우 경고 */
-                    return;
-                }
-            }
-
-            dataStore.push(...currentSet);  /* currentSet 데이터를 dataStore에 추가 */
-            completedSets++;  /* 완료된 세트 수 증가 */
-            totalCompletedSets++;  /* 총 완료 횟수 증가 */
-
-            if (completedSets >= 50) {
-                alert("50세트를 모두 완료했습니다. 데이터를 다운로드 하세요.");  /* 50세트를 완료했을 때 경고 */
-            }
-
-            alert("데이터가 성공적으로 제출되었습니다!");  /* 데이터 제출 성공 메시지 */
-            updateCounter();  /* 카운터 업데이트 */
-            document.getElementById('set-container').innerHTML = '';  /* 기존 세트 초기화 */
-            initializeForm();  /* 새로운 세트 생성 */
-        }
-
-        function downloadExcel() {
-            if (dataStore.length === 0) {
-                alert("다운로드할 데이터가 없습니다.");  /* 저장된 데이터가 없는 경우 경고 */
-                return;
-            }
-
-            const headers = ["Task", "Instruction", "Type Level 1", "Type Level 2", "Question", "Model Answer", "Modified Answer", "Reasoning"];  /* Excel 파일의 헤더 설정 */
-            const data = [headers];
-
-            dataStore.forEach(entry => {
-                data.push([
-                    entry.task,
-                    entry.instruction,
-                    entry.typeLevel1,
-                    entry.typeLevel2,
-                    entry.question,
-                    entry.modelAnswer,
-                    entry.modifiedAnswer,
-                    entry.reasoning,
-                ]);  /* 각 데이터 항목을 Excel 파일에 추가 */
-            });
-
-            const workbook = XLSX.utils.book_new();  /* 새로운 워크북 생성 */
-            const worksheet = XLSX.utils.aoa_to_sheet(data);  /* 데이터를 시트로 변환 */
-            XLSX.utils.book_append_sheet(workbook, worksheet, "대화 데이터");  /* 워크북에 시트 추가 */
-
-            XLSX.writeFile(workbook, "대화형_데이터.xlsx");  /* Excel 파일 다운로드 */
-
-            // 다운로드 후 데이터 초기화
-            dataStore = [];
-            completedSets = 0;
-            updateCounter();  /* 데이터 초기화 및 카운터 업데이트 */
-        }
-
-        initializeForm();  /* 폼 초기화 */
-        updateCounter();  /* 카운터 초기화 */
+        initializeForm();
+        updateCounter();
     </script>
 </body>
 </html>
